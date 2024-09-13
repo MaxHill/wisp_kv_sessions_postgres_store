@@ -1,5 +1,3 @@
-import gleam/dict
-import gleam/dynamic
 import gleam/io
 import gleam/json
 import gleam/list
@@ -7,6 +5,7 @@ import gleam/option
 import gleam/pgo
 import gleam/result
 import wisp
+import wisp_kv_sessions/internal
 import wisp_kv_sessions/session
 import wisp_kv_sessions/session_config
 
@@ -49,7 +48,7 @@ fn get_session(db: pgo.Connection) {
         sql,
         db,
         [pgo.text(session.id_to_string(session_id))],
-        decode_session_row,
+        internal.decode_session_row,
       )
       |> result.map_error(fn(err) {
         io.debug(err)
@@ -69,7 +68,7 @@ fn get_session(db: pgo.Connection) {
     |> option.from_result
     |> option.map(fn(row) {
       use data <- result.map(
-        decode_data_from_string(row.2)
+        internal.decode_data_from_string(row.2)
         |> result.map_error(fn(err) {
           io.debug(err)
           session.DeserializeError("Could not deserialize data")
@@ -113,7 +112,7 @@ fn save_session(db: pgo.Connection) {
         [
           pgo.text(session.id_to_string(new_session.id)),
           pgo.timestamp(new_session.expires_at),
-          pgo.text(json.to_string(encode_data(new_session.data))),
+          pgo.text(json.to_string(internal.encode_data(new_session.data))),
         ],
         fn(_) { Ok(Nil) },
       )
@@ -154,36 +153,4 @@ fn delete_session(db: pgo.Connection) {
       }
     }
   }
-}
-
-// Encode/Decode rows
-//--------------------
-
-pub fn decode_session_row(data: dynamic.Dynamic) {
-  data
-  |> dynamic.from
-  |> dynamic.tuple3(
-    dynamic.string,
-    dynamic.tuple2(
-      dynamic.tuple3(dynamic.int, dynamic.int, dynamic.int),
-      dynamic.tuple3(dynamic.int, dynamic.int, dynamic.int),
-    ),
-    dynamic.string,
-  )
-}
-
-pub fn encode_data(data: dict.Dict(String, String)) {
-  data
-  |> dict.fold([], fn(acc, key, val) {
-    acc |> list.append([#(key, json.string(val))])
-  })
-  |> json.object
-}
-
-pub fn decode_data(data: dynamic.Dynamic) {
-  dynamic.from(data) |> dynamic.dict(dynamic.string, dynamic.string)
-}
-
-pub fn decode_data_from_string(str: String) {
-  json.decode(from: str, using: decode_data)
 }

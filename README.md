@@ -7,10 +7,26 @@
 gleam add wisp_kv_sessions_postgres_store@1
 ```
 ```gleam
-import wisp_kv_sessions_postgres_store
+import wisp_kv_sessions/postgres_store
 
 pub fn main() {
-  // TODO: An example of the project in use
+  let db = pgo.connect(pgo.default_config())
+  
+  // Migrate
+  use _ <- result.try(postgres_store.migrate_up(conn))
+
+  // Setup session_store
+  use postgres_store <- result.map(postgres_store.try_create_session_store(conn))
+
+  // Create session config
+  let session_config =
+    session_config.Config(
+      default_expiry: session.ExpireIn(60 * 60),
+      cookie_name: "SESSION_COOKIE",
+      store: postgres_store,
+    )
+
+  //...
 }
 ```
 
