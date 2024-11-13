@@ -2,14 +2,14 @@ import gleam/io
 import gleam/json
 import gleam/list
 import gleam/option
-import gleam/pgo
 import gleam/result
+import pog
 import wisp
 import wisp_kv_sessions/internal
 import wisp_kv_sessions/session
 import wisp_kv_sessions/session_config
 
-pub fn try_create_session_store(db: pgo.Connection) {
+pub fn try_create_session_store(db: pog.Connection) {
   session_config.SessionStore(
     default_expiry: 60 * 60,
     get_session: get_session(db),
@@ -18,7 +18,7 @@ pub fn try_create_session_store(db: pgo.Connection) {
   )
 }
 
-pub fn migrate_up(db: pgo.Connection) {
+pub fn migrate_up(db: pog.Connection) {
   let sql =
     "
     CREATE TABLE IF NOT EXISTS wisp_kv_sessions (
@@ -28,28 +28,29 @@ pub fn migrate_up(db: pgo.Connection) {
     );
     "
 
-  pgo.execute(sql, db, [], fn(_) { Ok(Nil) })
+  pog.query(sql)
+  |> pog.execute(db)
 }
 
-pub fn migrate_down(db: pgo.Connection) {
+pub fn migrate_down(db: pog.Connection) {
   let sql = "DROP TABLE IF EXISTS wisp_kv_sessions"
-  pgo.execute(sql, db, [], fn(_) { Ok(Nil) })
+  pog.query(sql)
+  |> pog.execute(db)
 }
 
-fn get_session(db: pgo.Connection) {
+fn get_session(db: pog.Connection) {
   fn(session_id: session.SessionId) {
     let sql =
       "
       SELECT session_id, expires_at, data from wisp_kv_sessions
       WHERE session_id = $1;
       "
+
     use returned <- result.try(
-      pgo.execute(
-        sql,
-        db,
-        [pgo.text(session.id_to_string(session_id))],
-        internal.decode_session_row,
-      )
+      pog.query(sql)
+      |> pog.parameter(pog.text(session.id_to_string(session_id)))
+      |> pog.returning(internal.decode_session_row)
+      |> pog.execute(db)
       |> result.map_error(fn(err) {
         io.debug(err)
         wisp.log_error(
@@ -91,7 +92,7 @@ fn get_session(db: pgo.Connection) {
   }
 }
 
-fn save_session(db: pgo.Connection) {
+fn save_session(db: pog.Connection) {
   fn(new_session: session.Session) {
     let sql =
       "
@@ -105,17 +106,33 @@ fn save_session(db: pgo.Connection) {
       "
 
     // io.debug(birl.to_erlang_datetime(new_session.expires_at))
+    let #(#(year, month, day), #(hour, minute, seconds)) =
+      new_session.expires_at
     let insert =
-      pgo.execute(
-        sql,
-        db,
-        [
-          pgo.text(session.id_to_string(new_session.id)),
-          pgo.timestamp(new_session.expires_at),
-          pgo.text(json.to_string(internal.encode_data(new_session.data))),
-        ],
-        fn(_) { Ok(Nil) },
+      pog.query(sql)
+      |> pog.parameter(pog.text(session.id_to_string(new_session.id)))
+      |> pog.parameter(
+        pog.timestamp(pog.Timestamp(
+          pog.Date(year, month, day),
+          pog.Time(hour, minute, seconds, 0),
+        )),
       )
+      |> pog.parameter(
+        pog.text(json.to_string(internal.encode_data(new_session.data))),
+      )
+      |> pog.execute(db)
+
+    // let insert =
+    //   pog.execute(
+    //     sql,
+    //     db,
+    //     [
+    //       pog.text(session.id_to_string(new_session.id)),
+    //       pog.timestamp(new_session.expires_at),
+    //       pog.text(json.to_string(internal.encode_data(new_session.data))),
+    //     ],
+    //     fn(_) { Ok(Nil) },
+    //   )
 
     case insert {
       Ok(_) -> Ok(new_session)
@@ -128,7 +145,7 @@ fn save_session(db: pgo.Connection) {
   }
 }
 
-fn delete_session(db: pgo.Connection) {
+fn delete_session(db: pog.Connection) {
   fn(session_id: session.SessionId) {
     let sql =
       "
@@ -137,9 +154,9 @@ fn delete_session(db: pgo.Connection) {
     "
 
     case
-      pgo.execute(sql, db, [pgo.text(session.id_to_string(session_id))], fn(_) {
-        Ok(Nil)
-      })
+      pog.query(sql)
+      |> pog.parameter(pog.text(session.id_to_string(session_id)))
+      |> pog.execute(db)
     {
       Ok(_) -> Ok(Nil)
       Error(err) -> {

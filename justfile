@@ -6,10 +6,12 @@ export DB_PASSWORD:="mySuperSecretPassword!" # Remember to update the DATABASE_U
 export DB_PORT:="5432" # Remember to update the DATABASE_URL
 export DB_TAG:="wisp_kv_sessions_postgres_store"
 
+watch_test:
+    watchexec --restart --verbose --clear --wrap-process=session --stop-signal SIGTERM --exts gleam --watch ./ -- "gleam test"
 
 # DB
 db_create:
-	docker run -d \
+	docker run \
 	 -p $DB_PORT:5432 \
 	 -e POSTGRES_PASSWORD=$DB_PASSWORD \
 	 --name $DB_TAG \

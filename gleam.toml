@@ -14,12 +14,12 @@ repository = { type = "github", user = "MaxHill", repo = "wisp_kv_sessions_postg
 
 [dependencies]
 gleam_stdlib = ">= 0.34.0 and < 2.0.0"
-gleam_pgo = ">= 0.14.0 and < 1.0.0"
 # wisp_kv_sessions = {path= "../wisp_kv_sessions/"}
 birl = ">= 1.7.1 and < 2.0.0"
 gleam_json = ">= 1.0.1 and < 2.0.0"
 wisp = ">= 1.1.0 and < 2.0.0"
 wisp_kv_sessions = ">= 0.0.2 and < 1.0.0"
+pog = ">= 1.0.0 and < 2.0.0"
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"
