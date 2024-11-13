@@ -31,6 +31,7 @@ pub fn main() {
 ```
 
 Further documentation can be found at <https://hexdocs.pm/wisp_kv_sessions_postgres_store>.
+And <https://hexdocs.pm/wisp_kv_sessions>
 
 ## Development
 

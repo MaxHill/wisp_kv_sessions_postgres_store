@@ -1,6 +1,3 @@
-import gleam/dict
-import gleam/dynamic
-import gleam/json
 import gleeunit/should
 import test_helpers
 import wisp_kv_sessions/postgres_store
