@@ -5,13 +5,11 @@ import gleam/option
 import gleam/result
 import pog
 import wisp
-import wisp_kv_sessions/internal
 import wisp_kv_sessions/session
 import wisp_kv_sessions/session_config
 
-pub fn try_create_session_store(db: pog.Connection) {
+pub fn new(db: pog.Connection) {
   session_config.SessionStore(
-    default_expiry: 60 * 60,
     get_session: get_session(db),
     save_session: save_session(db),
     delete_session: delete_session(db),
@@ -49,7 +47,7 @@ fn get_session(db: pog.Connection) {
     use returned <- result.try(
       pog.query(sql)
       |> pog.parameter(pog.text(session.id_to_string(session_id)))
-      |> pog.returning(internal.decode_session_row)
+      |> pog.returning(decode_session_row)
       |> pog.execute(db)
       |> result.map_error(fn(err) {
         io.debug(err)
@@ -69,7 +67,7 @@ fn get_session(db: pog.Connection) {
     |> option.from_result
     |> option.map(fn(row) {
       use data <- result.map(
-        internal.decode_data_from_string(row.2)
+        decode_data_from_string(row.2)
         |> result.map_error(fn(err) {
           io.debug(err)
           session.DeserializeError("Could not deserialize data")
@@ -117,9 +115,7 @@ fn save_session(db: pog.Connection) {
           pog.Time(hour, minute, seconds, 0),
         )),
       )
-      |> pog.parameter(
-        pog.text(json.to_string(internal.encode_data(new_session.data))),
-      )
+      |> pog.parameter(pog.text(json.to_string(encode_data(new_session.data))))
       |> pog.execute(db)
 
     // let insert =
@@ -170,4 +166,45 @@ fn delete_session(db: pog.Connection) {
       }
     }
   }
+}
+
+// Internal
+//---------------
+
+import gleam/dict
+import gleam/dynamic
+
+// Encode/Decode rows
+//--------------------
+
+@internal
+pub fn decode_session_row(data: dynamic.Dynamic) {
+  data
+  |> dynamic.from
+  |> dynamic.tuple3(
+    dynamic.string,
+    dynamic.tuple2(
+      dynamic.tuple3(dynamic.int, dynamic.int, dynamic.int),
+      dynamic.tuple3(dynamic.int, dynamic.int, dynamic.int),
+    ),
+    dynamic.string,
+  )
+}
+
+@internal
+pub fn encode_data(data: dict.Dict(String, String)) {
+  data
+  |> dict.fold([], fn(acc, key, val) {
+    acc |> list.append([#(key, json.string(val))])
+  })
+  |> json.object
+}
+
+fn decode_data(data: dynamic.Dynamic) {
+  dynamic.from(data) |> dynamic.dict(dynamic.string, dynamic.string)
+}
+
+@internal
+pub fn decode_data_from_string(str: String) {
+  json.decode(from: str, using: decode_data)
 }
